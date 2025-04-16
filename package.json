@@ -1,0 +1,31 @@
+{
+  "name": "serveur-tcp",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000i\u0000o\u0000t\u0000-\u0000t\u0000c\u0000p\u0000-\u0000a\u0000p\u0000i\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "clean": "rimraf dist"
+  }
+
+,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arnaud-rein/iot-tcp-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/arnaud-rein/iot-tcp-api/issues"
+  },
+  "homepage": "https://github.com/arnaud-rein/iot-tcp-api#readme",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "rimraf": "^6.0.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  }
+}
