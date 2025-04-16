@@ -1,27 +1,44 @@
 import * as net from 'net';
+import { encode } from './lib/cbor'; // adapte le chemin si besoin
 
+// Données à envoyer
+const message = {
+    name: 'Volvic',
+    position: {
+        latitude: 888.85,
+        longitude: 2.35
+    }
+};
+
+// Encode avec CBOR
+const encoded = encode(message);
+
+// Vérifie si c'est une string ou un Uint8Array
+const buffer = typeof encoded === 'string'
+    ? Buffer.from(encoded, 'utf-8') // encodage texte si string
+    : Buffer.from(encoded);         // direct si Uint8Array
+
+// Création du socket TCP
 const client = new net.Socket();
 
 client.connect(4000, 'localhost', () => {
-    const bloc = 'testtestestet;777.85;2.35';
-    console.log("📤 Envoi :", bloc);
+    console.log("📡 Connecté au serveur");
+    console.log("📤 Envoi CBOR :", message);
 
-    // On attend que le message soit écrit avant de fermer
-    client.write(bloc, () => {
-        console.log("✅ Message envoyé");
-        // Ne ferme la connexion qu'après envoi complet
-        client.end();
+    client.write(buffer, () => {
+        console.log("✅ Donnée envoyée");
+        client.end(); // fermeture propre après envoi
     });
 });
 
 client.on('data', (data) => {
-    console.log("📥 Réponse du serveur :", data.toString());
+    console.log("📥 Réponse serveur :", data.toString());
 });
 
 client.on('close', () => {
-    console.log('🔌 Connexion TCP fermée');
+    console.log("🔌 Connexion fermée");
 });
 
 client.on('error', (err) => {
-    console.error('❌ Erreur client TCP :', err.message);
+    console.error("❌ Erreur client TCP :", err.message);
 });

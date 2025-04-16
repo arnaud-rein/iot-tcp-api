@@ -1,5 +1,6 @@
 import * as net from 'net';
 import { connectToMongo, getDb } from './db/db';
+import { decode} from './lib/cbor';
 
 interface Position {
     latitude: number;
@@ -22,37 +23,29 @@ async function startServer() {
 
         socket.on('data', async (buffer) => {
             try {
-                const text = buffer.toString().trim();
-                console.log("📥 Reçu :", text);
+                const parsed = decode(buffer); // CBOR → JSON
+                console.log("📥 Donnée décodée :", parsed);
 
-                const parts = text.split(';');
-                if (parts.length !== 3) {
-                    throw new Error("❌ Format invalide (attendu : name;lat;lng)");
-                }
-
-                const name = parts[0].trim();
-                const latitude = parseFloat(parts[1].trim());
-                const longitude = parseFloat(parts[2].trim());
-
-                if (isNaN(latitude) || isNaN(longitude)) {
-                    throw new Error("❌ Latitude ou longitude invalide");
+                const { name, position } = parsed;
+                if (!name || !position?.latitude || !position?.longitude) {
+                    throw new Error("❌ Donnée invalide");
                 }
 
                 const data: DataPoint = {
                     name,
-                    position: { latitude, longitude },
+                    position: {
+                        latitude: parseFloat(position.latitude),
+                        longitude: parseFloat(position.longitude)
+                    },
                     receivedAt: new Date()
                 };
 
-                console.log("📤 Insertion MongoDB :", data);
-
                 const result = await collection.insertOne(data);
-                console.log("✅ Document inséré avec _id :", result.insertedId);
-
-                socket.write("✅ Donnée enregistrée\n");
+                console.log("✅ Document inséré :", result.insertedId);
+                socket.write("✅ Donnée CBOR enregistrée\n");
             } catch (err) {
                 console.error("❌ Erreur serveur :", err);
-                socket.write("❌ Erreur serveur\n");
+                socket.write("❌ Erreur de décodage ou format\n");
             }
         });
 
@@ -61,7 +54,7 @@ async function startServer() {
     });
 
     server.listen(4000, () => {
-        console.log("🚀 Serveur TCP actif sur le port 4000");
+        console.log("🚀 Serveur TCP CBOR actif sur le port 4000");
     });
 }
 
