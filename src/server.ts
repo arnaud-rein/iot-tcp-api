@@ -1,48 +1,68 @@
-// tcp-server/index.ts
-import net from 'net';
-import axios from 'axios';
-import { encode, decode } from './lib/cbor';
+import * as net from 'net';
+import { connectToMongo, getDb } from './db/db';
 
-// Exemple d'utilisation
-const obj = { temperature: 22.4, humidity: 45 };
-const encoded = encode(obj);
-console.log("Encoded CBOR buffer:", encoded);
+interface Position {
+    latitude: number;
+    longitude: number;
+}
 
-const decoded = decode(encoded as Uint8Array);
-console.log("Decoded object:", decoded);
+interface DataPoint {
+    name: string;
+    position: Position;
+    receivedAt?: Date;
+}
 
+async function startServer() {
+    await connectToMongo();
+    const db = getDb();
+    const collection = db.collection<DataPoint>('mesures');
 
-const server = net.createServer((socket) => {
-    console.log('Client connecté');
+    const server = net.createServer((socket) => {
+        console.log("📡 Nouvelle connexion");
 
-    socket.on('data', async (data) => {
-        const message = data.toString();
-        console.log('Message TCP reçu :', message);
+        socket.on('data', async (buffer) => {
+            try {
+                const text = buffer.toString().trim();
+                console.log("📥 Reçu :", text);
 
-        // Envoie le message à Express via HTTP
-        try {
-            const response = await axios.post('http://localhost:3000/tcp-data', {
-                message
-            });
-            console.log('Réponse d\'Express :', response.data);
-        } catch (error) {
-            console.error('Erreur en envoyant à Express:');
-        }
+                const parts = text.split(';');
+                if (parts.length !== 3) {
+                    throw new Error("❌ Format invalide (attendu : name;lat;lng)");
+                }
+
+                const name = parts[0].trim();
+                const latitude = parseFloat(parts[1].trim());
+                const longitude = parseFloat(parts[2].trim());
+
+                if (isNaN(latitude) || isNaN(longitude)) {
+                    throw new Error("❌ Latitude ou longitude invalide");
+                }
+
+                const data: DataPoint = {
+                    name,
+                    position: { latitude, longitude },
+                    receivedAt: new Date()
+                };
+
+                console.log("📤 Insertion MongoDB :", data);
+
+                const result = await collection.insertOne(data);
+                console.log("✅ Document inséré avec _id :", result.insertedId);
+
+                socket.write("✅ Donnée enregistrée\n");
+            } catch (err) {
+                console.error("❌ Erreur serveur :", err);
+                socket.write("❌ Erreur serveur\n");
+            }
+        });
+
+        socket.on('end', () => console.log("🔌 Client déconnecté"));
+        socket.on('error', (err) => console.error("⚠️ Socket error:", err.message));
     });
 
-    socket.on('end', () => {
-        console.log('Client déconnecté');
+    server.listen(4000, () => {
+        console.log("🚀 Serveur TCP actif sur le port 4000");
     });
-});
+}
 
-server.listen(5000, () => {
-    console.log('Serveur TCP écoute sur le port 5000');
-});
-
-
-const test = { status: "ok", value: 42 };
-const bin = encode(test);
-console.log("CBOR:", bin);
-
-const parsed = decode(bin as Uint8Array);
-console.log("CBOR Decoded:", parsed);
+startServer();
